@@ -1,0 +1,11 @@
+19:49:35 **** Incremental Build of configuration Debug for project proyecto ****
+cs-make all 
+'Invoking: ARM Sourcery Windows GNU Print Size'
+arm-none-eabi-size  --format=berkeley proyecto.elf
+   text	   data	    bss	    dec	    hex	filename
+  59084	   1208	 679604	 739896	  b4a38	proyecto.elf
+'Finished building: proyecto.siz'
+' '
+
+19:49:35 Build Finished (took 550ms)
+

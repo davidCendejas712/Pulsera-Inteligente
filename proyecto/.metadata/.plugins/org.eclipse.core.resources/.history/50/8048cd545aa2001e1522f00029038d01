@@ -1,0 +1,501 @@
+#include <s3c44b0x.h>
+#include <s3cev40.h>
+#include <common_types.h>
+#include <leds.h>
+#include <lcd.h>
+#include <system.h>
+#include <ts.h>
+#include <pbs.h>
+#include <iis.h>
+#include <uda1341ts.h>
+#include <keypad.h>
+#include <rtc.h>
+#include <timers.h>
+#include "sensorsEmulator.h"
+
+
+
+#define INICIO      ((uint8 *)0x0c210000)
+#define RELOJ       ((uint8 *)0x0c220000)
+#define m11    ((uint8 *)0x0c230000)
+#define m12      ((uint8 *)0x0c240000)
+#define m13    ((uint8 *)0x0c250000)
+#define m14      ((uint8 *)0x0c260000)
+#define m15  ((uint8 *)0x0c270000)
+#define m21    ((uint8 *)0x0c280000)
+#define m22      ((uint8 *)0x0c290000)
+#define m23    ((uint8 *)0x0c2a0000)
+#define m24      ((uint8 *)0x0c2b0000)
+#define m25  ((uint8 *)0x0c2c0000)
+#define m31    ((uint8 *)0x0c300000)
+#define m32      ((uint8 *)0x0c310000)
+#define m33    ((uint8 *)0x0c320000)
+#define m34      ((uint8 *)0x0c330000)
+#define m35  ((uint8 *)0x0c340000)
+#define m41    ((uint8 *)0x0c350000)
+#define m42      ((uint8 *)0x0c360000)
+#define m43    ((uint8 *)0x0c370000)
+#define m44      ((uint8 *)0x0c380000)
+#define m45  ((uint8 *)0x0c390000)
+#define m51    ((uint8 *)0x0c3a0000)
+#define m52      ((uint8 *)0x0c3b0000)
+#define m53    ((uint8 *)0x0c3c0000)
+#define m54      ((uint8 *)0x0c400000)
+#define m55  ((uint8 *)0x0c410000)
+
+#define NOKIATUNE  ((int16 *)0x0c420000)
+#define TEMON  ((int16 *)0x0c480000)
+
+
+
+
+
+uint8 *mapaM[5][5]={{m11,m12,m13,m14,m15},
+				    {m21,m22,m23,m24,m25},
+				    {m31,m32,m33,m34,m35},
+				    {m41,m42,m43,m44,m45},
+				    {m51,m52,m53,m54,m55}};
+
+
+void isr_pb( void ) __attribute__ ((interrupt ("IRQ")));
+static void beatHandler( void ) __attribute__ ((interrupt ("IRQ")));
+static void stepHandler( void ) __attribute__ ((interrupt ("IRQ")));
+void isr_keypad( void ) __attribute__ ((interrupt ("IRQ")));
+void one_second_loop( void );
+/*******************************************************************/
+void mapa(void);
+void reloj(void);
+void cronometro(void);
+void temporizador(void);
+void alarma(void);
+
+volatile static boolean newBeat = FALSE;
+volatile static boolean newStep = FALSE;
+
+
+volatile boolean flagPb;
+/*******************************************************************/
+
+void main( void )
+{
+	uint16 x, y;
+	sys_init();
+	leds_init();
+	pbs_init();
+	lcd_init();
+	lcd_clear();
+    lcd_on();
+    ts_init();
+    ts_on();
+    timers_init();
+    rtc_init();
+    keypad_init();
+    keypad_open(isr_keypad);
+
+	startSensorsEmulator( beatHandler, stepHandler, 60, 60 );     // Arranca el emulador de sensores, instalando beatHandler y stepHandler como RTI de los respectivos sensores
+    while( 1 )
+    {
+    	/************************************/
+
+
+
+
+
+    	        lcd_putWallpaper( INICIO );
+
+    	        /************************************/
+
+
+
+    	//lcd_draw_box( 5, 5, 315, 235, BLACK, 5 );
+
+
+    		lcd_puts_x3( 60, 40, BLACK, __TIME__ );
+
+
+
+
+    	lcd_draw_box( 50, 30, 255,110, BLACK, 2 );
+    	ts_getpos( &x, &y );
+    	if( x>50 && y>30 && x<255  && y<110 )
+		{
+			reloj();
+		}
+    	if( x>0 && y>167 && x<  105&& y<240 )
+		{
+			lcd_putchar_x2(  21 ,  176, WHITE, 'P' );
+
+			lcd_putchar_x2(  21,  176, BLACK, 'P' );
+		}
+    	if( x>106 && y>167 && x<  210&& y<240 )
+		{
+			lcd_putchar_x2(  124,  176, WHITE, 'C' );
+
+			lcd_putchar_x2(  124,  176, BLACK, 'C' );
+		}
+    	if( x>211 && y>167 && x< 320&& y<240 )
+		{
+    		mapa();
+
+		}
+
+    	if( newBeat )
+    	{
+    		newBeat = FALSE;
+    		led_toggle( LEFT_LED );
+    	}
+    	if( newStep )
+    	{
+    		newStep = FALSE;
+    		led_toggle( RIGHT_LED );
+    	}
+    }
+}
+
+char* hexadecimalAString(int32 i){
+	char buf[8 + 1];
+	char *p = buf + 8;
+	uint8 c;
+
+	*p = '\0';
+
+	do {
+		c = i & 0xf;
+		if( c < 10 )
+			*--p = '0' + c;
+		else
+			*--p = 'a' + c - 10;
+		i = i >> 4;
+	} while( i );
+	return p;
+}
+void beatHandler( void )
+{
+    newBeat = TRUE;
+    I_ISPC  = BIT_BEATEMULATOR;
+}
+
+void stepHandler( void )
+{
+    newStep = TRUE;
+    I_ISPC  = BIT_STEPEMULATOR;
+}
+
+void reloj(void){
+	//pbs_init();
+	//pbs_open(isr_pb);
+	uint16 x, y;
+	lcd_clear();
+	boolean back = FALSE;
+
+	while(!back){
+
+		lcd_putWallpaper( RELOJ );
+
+
+
+		lcd_puts( 3, 8, BLACK, "back" );
+		lcd_draw_box( 0, 0, 45,30, BLACK, 2 );
+
+
+		ts_getpos( &x, &y );
+		if(x>0 && y>0 && x<45  && y<30){
+			back = TRUE;
+
+		}
+
+		if( x>0 && y>40 && x<106  && y<210){
+			cronometro();
+
+
+		}
+
+
+		if( x>106 && y>40 && x<214  && y<210){
+			temporizador();
+		}
+		if(x>215 && y>40 && x<319  && y<210){
+			alarma();
+		}
+
+
+
+
+
+
+
+
+
+	}
+	//pbs_close();
+
+}
+
+void cronometro(void){
+	uint16 x, y;
+		lcd_clear();
+		boolean back = FALSE;
+
+		while(!back){
+
+			lcd_puts( 3, 8, BLACK, "back" );
+			lcd_draw_box( 0, 0, 45,30, BLACK, 2 );
+
+			lcd_puts_x3( 80, 40, BLACK, "CRONO" );
+			ts_getpos( &x, &y );
+			if( x>0 && y>0 && x<45  && y<30){
+				back = TRUE;
+
+			}
+
+
+
+		}
+
+
+}
+void temporizador(void){
+	uint16 x, y;
+		lcd_clear();
+		boolean back = FALSE;
+		pbs_open(isr_pb);
+		static char* hora = "00:00:00";
+		static char* seg;
+		static char* min;
+		static char* hor;
+
+
+		while(!back){
+
+			lcd_puts( 3, 8, BLACK, "back" );
+			lcd_draw_box( 0, 0, 45,30, BLACK, 2 );
+			lcd_puts_x2 (83, 43, BLACK,  __TIME__ );
+			lcd_draw_box( 80, 40, 230,93, BLACK, 2 );
+
+			ts_getpos( &x, &y );
+			if( x>0 && y>0 && x<45  && y<30){
+				back = TRUE;
+
+			}
+		    uint8 scancode;
+			uint16  ticks = 0;
+
+			if( x>80 && y>40 && x<230  && y<93){
+
+				while(1){
+					lcd_puts_x3( 60, 40, BLACK, hora );
+
+				   while(ticks  != 2)
+					{
+
+					   lcd_puts (80, 120, BLACK, "Ingrese los segundos:" );
+
+					   lcd_puts_x3( 60, 40, BLACK, hora );
+						scancode = keypad_getchar();
+						str[15] = hexadecimalAString(scancode)[0];
+						hora[6+ticks]= hexadecimalAString(scancode)[0];
+						lcd_putint(60,167,BLACK, scancode);
+						ticks++;
+					}
+				   ticks = 0;
+				   lcd_puts_x3( 60, 40, BLACK, hora );
+
+				   while(ticks  != 2)
+								{
+
+								   lcd_puts (83, 43, BLACK, "Ingrese los minutos:" );
+
+								   lcd_puts_x3( 60, 40, BLACK, hora );
+									scancode = keypad_getchar();
+
+
+									hora[3+ticks]= hexadecimalAString(scancode)[0];
+									ticks++;
+
+								}
+
+				   ticks = 0;
+				   lcd_puts_x3( 60, 40, BLACK, hora );
+
+
+
+				while(ticks  != 2)
+								{
+
+								   lcd_puts_x2 (83, 43, BLACK, "Ingrese las horas:" );
+
+								   lcd_puts_x3( 60, 40, BLACK, hora );
+									scancode = keypad_getchar();
+
+									hora[ticks]= hexadecimalAString(scancode)[0];
+									ticks++;
+								}
+
+				lcd_clear();
+				lcd_puts_x3( 60, 40, BLACK, hora );
+
+				while(hora[0]!="0"){
+
+
+
+
+				}
+
+			}
+
+
+
+		}
+	}
+}
+void alarma(void){
+	//uda1341ts_init();
+	uint16 x, y;
+		lcd_clear();
+		boolean back = FALSE;
+		//pbs_init();
+		pbs_open(isr_pb);
+		while(!back){
+
+			lcd_puts( 3, 8, BLACK, "back" );
+			lcd_draw_box( 0, 0, 45,30, BLACK, 2 );
+			lcd_draw_box( 50, 30, 255,110, BLACK, 2 );
+			lcd_puts_x3( 80, 40, BLACK, "ALARMA" );
+			ts_getpos( &x, &y );
+			if( x>0 && y>0 && x<45  && y<30){
+				back = TRUE;
+
+			}
+
+
+			if( x>50 && y>30 && x<255  && y<110 )
+			{
+				 uda1341ts_init();
+				iis_init( IIS_DMA );
+
+				uda1341ts_setvol( VOL_MED );
+				iis_playWawFile( TEMON, TRUE );
+				while(pb_scan()!=PB_LEFT)
+					{
+
+
+					}
+				iis_pause();
+			}
+
+
+
+		}
+		pbs_close();
+
+}
+void mapa(void){
+
+	uint16 x, y;
+	pbs_init();
+	pbs_open(isr_pb);
+
+	lcd_clear();
+
+	int i =2, j = 2;
+
+	while(pb_scan()!=PB_LEFT){
+
+
+
+	/*	for( i = 0; i < 5; i ++){
+
+			for( j = 0; j<5;j++ ){
+
+				one_second_loop();
+				one_second_loop();
+				one_second_loop();
+				one_second_loop();
+				one_second_loop();
+			}
+
+		}
+		*
+		*/
+
+		lcd_putWallpaper(mapaM[i][j]);
+		ts_getpos( &x, &y );
+
+
+
+		if( x>0 && y>0 && x<105  && y<80 && i>=0 && j >=0 && i<4&&j<4){
+			i--;
+			j--;
+
+		}if(x>105 && y>0 && x<210  && y<80 && i>=0 && j >=0 && i<4&&j<4){ //arriba
+			i--;
+
+
+		}if(x>210 && y>0 && x<320  && y<80 && i>=0 && j >=0 && i<4&&j<4){
+			i--;
+			j++;
+
+		}if(x>0 && y>80 && x<105  && y<160 && i>=0 && j >=0 && i<4&&j<4){ //izquierda
+			j--;
+
+
+		}if(x>0 && y>160 && x<105  && y<240 && i>=0 && j >=0 && i<4&&j<4){
+			i++;
+			j--;
+
+
+		}if(x>105 && y>160 && x<210  && y<240 && i>=0 && j >=0 && i<4&&j<4){ //abajo
+			i++;
+
+
+		}if(x>210 && y>160 && x<320  && y<240 && i>=0 && j >=0 && i<4&&j<4){
+			i++;
+			j++;
+
+		}if(x>210 && y>80 && x<320  && y<160 && i>=0 && j >=0 && i<4&&j<4){ //derecha
+
+			j++;
+
+		}
+
+
+
+
+
+
+
+	}
+	pbs_close();
+
+}
+
+void one_second_loop( void )
+{
+    uint32 i;
+
+    for( i=591436; i; i-- );
+}
+void isr_pb( void )
+{
+    switch( pb_scan() )
+    {
+        case PB_FAILURE:
+            EXTINTPND = BIT_LEFTPB | BIT_RIGHTPB;
+            break;
+        case PB_LEFT:
+            EXTINTPND = BIT_LEFTPB;
+            break;
+        case PB_RIGHT:
+            EXTINTPND = BIT_RIGHTPB;
+            break;
+    }
+    flagPb = TRUE;
+    I_ISPC = BIT_PB;
+}
+void isr_keypad( void )
+{
+
+    I_ISPC = BIT_KEYPAD;
+}
+
+

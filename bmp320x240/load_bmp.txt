@@ -1,0 +1,55 @@
+#-------------------------------------------------------------------
+#
+#  Fichero:
+#    load_bmp.txt  26/3/2014
+#
+#    (c) J.M. Mendias
+#    Programación de Sistemas y Dispositivos
+#    Facultad de Informática. Universidad Complutense de Madrid
+#
+#  Propósito:
+#    Script del GDB que carga archivos BMP en la memoria de la placa 
+#    de prototipado S3CEV40 para su visualización por el LCD  
+#
+#  Notas de diseño:
+#    - El script está orientado a la realización del lab 7
+#    - Los ficheros BMP y este script deben estar ubicados en el mismo 
+#      directorio
+#    - Previo a su ejecución desde una consola del GDB, debe cambiarse 
+#      al mencionado directorio con el comando: cd <ruta>
+#    - Para ejecurtarlo debe usarse el comando: source load_bmp.txt
+#
+#-------------------------------------------------------------------
+
+echo Cargando ficheros BMP...\n
+
+restore inicio.bmp   binary 0x0c210000
+restore reloj2.bmp binary 0x0c220000
+restore 1.1.bmp binary 0x0c230000
+restore 1.2.bmp   binary 0x0c240000
+restore 1.3.bmp binary 0x0c250000
+restore 1.4.bmp   binary 0x0c260000
+restore 1.5.bmp    binary 0x0c270000
+restore 2.1.bmp  binary 0x0c280000
+restore 2.2.bmp  binary 0x0c290000
+restore 2.3.bmp  binary 0x0c2a0000
+restore 2.4.bmp   binary 0x0c2b0000
+restore 2.5.bmp binary 0x0c2c0000
+restore 3.1.bmp binary 0x0c300000
+restore 3.2.bmp   binary 0x0c310000
+restore 3.3.bmp binary 0x0c320000
+restore 3.4.bmp   binary 0x0c330000
+restore 3.5.bmp    binary 0x0c340000
+restore 4.1.bmp  binary 0x0c350000
+restore 4.2.bmp  binary 0x0c360000
+restore 4.3.bmp  binary 0x0c370000
+restore 4.4.bmp   binary 0x0c380000
+restore 4.5.bmp binary 0x0c390000
+restore 5.1.bmp binary 0x0c3a0000
+restore 5.2.bmp   binary 0x0c3b0000
+restore 5.3.bmp   binary 0x0c3c0000
+restore 5.4.bmp   binary 0x0c400000
+restore 5.5.bmp    binary 0x0c410000
+
+
+echo ...carga finalizada
